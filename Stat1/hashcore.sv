@@ -153,7 +153,7 @@ module hash_core(
     input bit d_valid,
     
     //Msg scheduler op
-    input logic [31:0] Kt_i,      //SHA constant for the current round  
+    input logic [31:0] Kt_i,      //SHA constant for the current round  from ROM module
     input logic [31:0] Wt_i,      //32 bit word from msg scheduler  
     
     //output: 8 working variable registers (each of 32 bits) that hold hash state
@@ -200,7 +200,7 @@ logic [31:0] sigma_0, sigma_1, Maj, Ch;
     //assign rom_addr = counter_iteration;
     
     //ROM instantiation
-   // rom constants (.clk(clk), .addr(rom_addr), data(Kt_i));
+   // ROM constants_inst (.clk(clk), .addr(rom_addr), data(Kt_i));
 
 always_comb
          begin
@@ -266,81 +266,89 @@ endmodule
 
 module iterative_processing(
     input  logic        clk,
-    input  logic        rst_n,           // Active low reset
-    input  logic        padding_done,    // Acts as the "Start" signal
-    input  logic [31:0] w,               // Message word input
-    output logic [31:0] a_out, b_out, c_out, d_out, e_out, f_out, g_out, h_out,
-    output logic        busy             // High while hashing 64 rounds
+    input  logic        rst_n,
+    input  logic        padding_done,
+    input  logic [31:0] w,
+    output logic [255:0] final_hash, // The full 256-bit result
+    output logic         done_pulse  // High for one cycle when hash is ready
 );
 
-    // Internal counter: needs 7 bits to count 0 to 64
-    logic [6:0] round_count;
+    logic [6:0]  round_count;
     logic [31:0] k_from_rom;
     logic [31:0] s0, s1, ch, maj, t1, t2;
+    logic        busy;
+
+    // Registers to hold the values at the START of the 64 rounds
+    logic [31:0] h0_init, h1_init, h2_init, h3_init, h4_init, h5_init, h6_init, h7_init;
+    
+    // Working registers (a-h)
+    logic [31:0] a, b, c, d, e, f, g, h;
 
     // ROTR function
     function automatic logic [31:0] rotr(input logic [31:0] x, input int n);
         rotr = (x >> n) | (x << (32 - n));
     endfunction
 
-    // ROM Instance: Address is driven by our internal counter
-    sha256_rom constants_inst (
-        .clk(clk),
-        .addr(round_count),
-        .dataout(k_from_rom)
-    );
+    sha256_rom constants_inst (.clk(clk), .addr(round_count), .dataout(k_from_rom));
 
-    // Combinational logic for the SHA-256 compression wires
+    // Combinational logic for the round
     always_comb begin
-        s0  = rotr(a_out, 2)  ^ rotr(a_out, 13) ^ rotr(a_out, 22);
-        s1  = rotr(e_out, 6)  ^ rotr(e_out, 11) ^ rotr(e_out, 25);
-        maj = (a_out & b_out) ^ (a_out & c_out) ^ (b_out & c_out);
-        ch  = (e_out & f_out) ^ (~e_out & g_out);
-        
-        t1  = h_out + s1 + ch + k_from_rom + w;
+        s0  = rotr(a, 2)  ^ rotr(a, 13) ^ rotr(a, 22);
+        s1  = rotr(e, 6)  ^ rotr(e, 11) ^ rotr(e, 25);
+        maj = (a & b) ^ (a & c) ^ (b & c);
+        ch  = (e & f) ^ (~e & g);
+        t1  = h + s1 + ch + k_from_rom + w;
         t2  = s0 + maj;
     end
 
-    // Sequential logic: Counter and Hash Registers
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            round_count <= 7'd0;
-            busy        <= 1'b0;
-            // Initialize H values
-            a_out <= 32'h6a09e667; b_out <= 32'hbb67ae85;
-            c_out <= 32'h3c6ef372; d_out <= 32'ha54ff53a;
-            e_out <= 32'h510e527f; f_out <= 32'h9b05688c;
-            g_out <= 32'h1f83d9ab; h_out <= 32'h5be0cd19;
-        end 
-        else begin
-            // START CONDITION
-            if (padding_done && !busy) begin
-                busy <= 1'b1;
-                round_count <= 7'd0;
-            end
+            busy <= 1'b0;
+            round_count <= 0;
+            done_pulse  <= 1'b0;
+            // Load initial constants
+            {a, b, c, d, e, f, g, h} <= {32'h6a09e667, 32'hbb67ae85, 32'h3c6ef372, 32'ha54ff53a, 
+                                         32'h510e527f, 32'h9b05688c, 32'h1f83d9ab, 32'h5be0cd19};
+        end else begin
+            done_pulse <= 1'b0; // Default state
             
-            // RUNNING CONDITION
-            if (busy) begin
+            if (!busy && padding_done) begin
+                busy <= 1'b1;
+                round_count <= 0;
+                // Capture the "Start" values to add later
+                {h0_init, h1_init, h2_init, h3_init, h4_init, h5_init, h6_init, h7_init} <= {a, b, c, d, e, f, g, h};
+            end 
+            else if (busy) begin
                 if (round_count < 64) begin
-                    // Update registers (The Shifting Logic)
-                    a_out <= t1 + t2;
-                    b_out <= a_out;
-                    c_out <= b_out;
-                    d_out <= c_out;
-                    e_out <= d_out + t1;
-                    f_out <= e_out;
-                    g_out <= f_out;
-                    h_out <= g_out;
-                    
+                    a <= t1 + t2;
+                    b <= a;
+                    c <= b;
+                    d <= c;
+                    e <= d + t1;
+                    f <= e;
+                    g <= f;
+                    h <= g;
                     round_count <= round_count + 1;
                 end 
                 else begin
-                    // STOP CONDITION
-                    busy <= 1'b0; 
+                    // ROUNDS FINISHED: Perform the final addition
+                    a <= a + h0_init;
+                    b <= b + h1_init;
+                    c <= c + h2_init;
+                    d <= d + h3_init;
+                    e <= e + h4_init;
+                    f <= f + h5_init;
+                    g <= g + h6_init;
+                    h <= h + h7_init;
+                    
+                    busy <= 1'b0;
+                    done_pulse <= 1'b1;
                 end
             end
         end
     end
 
-endmodule
+    // Concatenate all 8 registers into the final 256-bit output
+    assign final_hash = {a, b, c, d, e, f, g, h};
 
+endmodule
