@@ -144,3 +144,150 @@ assign finall = {A_o, B_o, C_o, D_o, E_o, F_o, G_o, H_o};
 
 endmodule
 
+
+//Current:
+`timescale 1ns / 1ps
+
+module hash_core(
+    input logic clk,
+    input logic rst_n,
+    input bit d_valid,
+    input logic [7:0] count,
+    
+    //Msg scheduler op
+    input logic [31:0] Kt_i,      //SHA constant for the current round  
+    input logic [31:0] Wt_i,      //32 bit word from msg scheduler  
+    
+    //output: 8 working variable registers (each of 32 bits) that hold hash state
+    output logic [31:0] A_o, B_o, C_o, D_o, E_o, F_o, G_o, H_o
+);
+//logic compute_done;   
+//state registers
+logic [31:0] A_i, B_i, C_i, D_i, E_i, F_i, G_i, H_i;
+
+// ROTR function
+function automatic logic [31:0] rotr(input logic [31:0] x, input int n);
+   rotr = (x>>n) | (x << (32-n));
+endfunction
+
+//function automatic logic [31:0] rotr6(input logic [31:0] x);
+//    return {x[5:0], x[31:6]};
+//endfunction
+
+//function automatic logic [31:0] rotr11(input logic [31:0] x);
+//    return {x[10:0], x[31:11]};
+//endfunction
+
+//function automatic logic [31:0] rotr13(input logic [31:0] x);
+//    return {x[12:0], x[31:13]};
+//endfunction
+
+//function automatic logic [31:0] rotr22(input logic [31:0] x);
+//    return {x[21:0], x[31:22]};
+//endfunction
+
+//function automatic logic [31:0] rotr25(input logic [31:0] x);
+//    return {x[24:0], x[31:25]};
+//endfunction
+
+// **FIX 1: T1_temp/T2_temp must use REGISTERED values (not inputs)**
+logic [31:0] T1, T2;
+logic [31:0] sigma_0, sigma_1, Maj, Ch;
+
+// ROM Address Logic
+    // If resetting, we could theoretically pull H values, but usually, 
+    // internal registers are hardcoded or loaded once. 
+    // For this design, we use counter_iteration to get K values.
+    //assign rom_addr = counter_iteration;
+    
+    //ROM instantiation
+   // rom constants (.clk(clk), .addr(rom_addr), data(Kt_i));
+
+always_comb
+         begin
+            assign sigma_1 = rotr(E_o,6) ^ rotr(E_o,11) ^ rotr(E_o,25);
+            assign sigma_0 = rotr(A_o,2) ^ rotr(A_o,13) ^ rotr22(A_o,22);
+            assign Maj = (A_o & B_o) ^ (A_o & C_i) ^ (B_i & C_i);
+            assign Ch = (E_i & F_i) ^ ((~ E_i) & G_i);
+            assign T1 = H_i + sigma_1 + Ch + Kt_i + Wt_i;
+            assign T2 = sigma_0 + Maj;
+         end
+
+// **FIX 2: State machine - proper 64 round counting**
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        state <= IDLE;
+        round_cnt <= 6'd0;
+        compute_done <= 1'b0;
+    end else begin
+        state <= next_state;
+        case (state)
+            IDLE: begin
+                round_cnt <= 6'd0;
+                compute_done <= 1'b0;
+            end
+            COMPUTE: begin
+                if (!compute_done) begin
+                    if (round_cnt == 6'd63) begin
+                        compute_done <= 1'b1;
+                    end else begin
+                        round_cnt <= round_cnt + 1;
+                    end
+                end
+            end
+            DONE: begin
+                round_cnt <= 6'd0;
+                compute_done <= 1'b0;
+            end
+        endcase
+    end
+end
+
+always_comb begin
+                next_state = state;
+                case (state) 
+                    IDLE:    if (load_i) next_state = COMPUTE;
+                    COMPUTE: if (compute_done) next_state = DONE;
+                    DONE:    if (!load_i) next_state = IDLE;  // **FIX 3: Wait for load_i to deassert**
+                endcase 
+            end
+
+// **Datapath - CORRECTED timing**
+always_ff @(posedge clk or negedge rst_n) 
+    begin
+        if (!rst_n)
+            begin
+                a <= 32'h0; b <= 32'h0; c <= 32'h0; d <= 32'h0;
+                e <= 32'h0; f <= 32'h0; g <= 32'h0; h <= 32'h0;
+            end 
+        else if (state == IDLE && load_i)
+            begin
+                a <= A_i; b <= B_i; c <= C_i; d <= D_i;
+                e <= E_i; f <= F_i; g <= G_i; h <= H_i;
+            end 
+        else if (state == COMPUTE && !compute_done) 
+            begin
+                h <= g;
+                g <= f;
+                f <= e;
+                e <= d + T1_temp;
+                d <= c;
+                c <= b;
+                b <= a;
+                a <= T1_temp + T2_temp;
+            end
+        end
+
+assign A_o = A_i + a;
+assign B_o = B_i + b;
+assign C_o = C_i + c;
+assign D_o = D_i + d;
+assign E_o = E_i + e;
+assign F_o = F_i + f;
+assign G_o = G_i + g;
+assign H_o = H_i + h;
+
+assign finall = {A_o, B_o, C_o, D_o, E_o, F_o, G_o, H_o};
+
+endmodule
+
