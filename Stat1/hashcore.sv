@@ -291,3 +291,86 @@ assign finall = {A_o, B_o, C_o, D_o, E_o, F_o, G_o, H_o};
 
 endmodule
 
+//Trial 2:
+`timescale 1ns / 1ps
+
+module iterative_processing(
+    input  logic        clk,
+    input  logic        rst_n,           // Active low reset
+    input  logic        padding_done,    // Acts as the "Start" signal
+    input  logic [31:0] w,               // Message word input
+    output logic [31:0] a_out, b_out, c_out, d_out, e_out, f_out, g_out, h_out,
+    output logic        busy             // High while hashing 64 rounds
+);
+
+    // Internal counter: needs 7 bits to count 0 to 64
+    logic [6:0] round_count;
+    logic [31:0] k_from_rom;
+    logic [31:0] s0, s1, ch, maj, t1, t2;
+
+    // ROTR function
+    function automatic logic [31:0] rotr(input logic [31:0] x, input int n);
+        rotr = (x >> n) | (x << (32 - n));
+    endfunction
+
+    // ROM Instance: Address is driven by our internal counter
+    sha256_rom constants_inst (
+        .clk(clk),
+        .addr(round_count),
+        .dataout(k_from_rom)
+    );
+
+    // Combinational logic for the SHA-256 compression wires
+    always_comb begin
+        s0  = rotr(a_out, 2)  ^ rotr(a_out, 13) ^ rotr(a_out, 22);
+        s1  = rotr(e_out, 6)  ^ rotr(e_out, 11) ^ rotr(e_out, 25);
+        maj = (a_out & b_out) ^ (a_out & c_out) ^ (b_out & c_out);
+        ch  = (e_out & f_out) ^ (~e_out & g_out);
+        
+        t1  = h_out + s1 + ch + k_from_rom + w;
+        t2  = s0 + maj;
+    end
+
+    // Sequential logic: Counter and Hash Registers
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            round_count <= 7'd0;
+            busy        <= 1'b0;
+            // Initialize H values
+            a_out <= 32'h6a09e667; b_out <= 32'hbb67ae85;
+            c_out <= 32'h3c6ef372; d_out <= 32'ha54ff53a;
+            e_out <= 32'h510e527f; f_out <= 32'h9b05688c;
+            g_out <= 32'h1f83d9ab; h_out <= 32'h5be0cd19;
+        end 
+        else begin
+            // START CONDITION
+            if (padding_done && !busy) begin
+                busy <= 1'b1;
+                round_count <= 7'd0;
+            end
+            
+            // RUNNING CONDITION
+            if (busy) begin
+                if (round_count < 64) begin
+                    // Update registers (The Shifting Logic)
+                    a_out <= t1 + t2;
+                    b_out <= a_out;
+                    c_out <= b_out;
+                    d_out <= c_out;
+                    e_out <= d_out + t1;
+                    f_out <= e_out;
+                    g_out <= f_out;
+                    h_out <= g_out;
+                    
+                    round_count <= round_count + 1;
+                end 
+                else begin
+                    // STOP CONDITION
+                    busy <= 1'b0; 
+                end
+            end
+        end
+    end
+
+endmodule
+
