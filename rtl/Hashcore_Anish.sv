@@ -143,14 +143,14 @@ begin
 
 end
 
-assign A_o = a;
-assign B_o = b;
-assign C_o = c;
-assign D_o = d;
-assign E_o = e;
-assign F_o = f;
-assign G_o = g;
-assign H_o = h;
+assign A_o = a + A_i;
+assign B_o = b + B_i;
+assign C_o = c + C_i;
+assign D_o = d + D_i;
+assign E_o = e + E_i;
+assign F_o = f + F_i;
+assign G_o = g + G_i;
+assign H_o = h + H_i;
 
 assign finall = {A_o, B_o, C_o, D_o, E_o, F_o, G_o, H_o};
 
