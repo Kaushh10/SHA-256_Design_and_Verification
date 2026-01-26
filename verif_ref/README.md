@@ -1,8 +1,2 @@
-# CDAC_Final_Project
-Final project and its references/resources
+# Verification references Added here
 
-Stat1 folder contains the design files written in sv.
-
-
-
-https://opencores.org/usercontent/img/1468893218
