@@ -1,4 +1,5 @@
 `timescale 1ns / 1ps
+`include "sha_functions.svh"
 //////////////////////////////////////////////////////////////////////////////////
 // Created by : Nisarg and Shravani
 // Create Date: 01/26/2026 08:55:02 PM
@@ -19,12 +20,14 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module msg_sch (
-                    input clk,
-                    input rst,
-                    input [31:0] M_i,
-                    
-                    
-                    
+                    input         clk,
+                    input         rst,
+                    input [31:0]  M_i,
+                    input         M_dv,
+                    output [31:0] W_o,
+                    output        W_dv
 );
+
+
 
 endmodule
