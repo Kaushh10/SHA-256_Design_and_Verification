@@ -185,7 +185,7 @@ endfunction
     //assign rom_addr = counter_iteration;
     
     //ROM instantiation
-   // ROM constants_inst (.clk(clk), .addr(rom_addr), data(Kt_i));
+    // ROM constants_inst (.clk(clk), .addr(rom_addr), dataout(Kt_i));
 
 always_comb
          begin
