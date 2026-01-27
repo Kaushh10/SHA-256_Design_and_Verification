@@ -17,11 +17,10 @@
 // Additional Comments:
 // 
 
-
 `timescale 1ns / 1ps
-`include "sha_functions.svh" 
+`include "sha_functions.sv" 
 
-module message_scheduler(
+module msg_sch(
     input  logic clk,
     input  logic rst, 
     // Input lines from preprocessor
