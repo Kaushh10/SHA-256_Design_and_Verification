@@ -22,32 +22,35 @@
 module msg_sch (
                     input  logic        clk,
                     input  logic        rst,
-                    input  logic [31:0] M_i,
+                    //Input Lines from Preprocessor
+                    input  logic [31:0] M_i,   
                     input  logic        M_dv,
+                    //Output Lines for Hash Core
                     output logic [31:0] W_o,
                     output logic        W_dv
 );
 
 
-logic [5:0] W_count;
-logic [31:0] W_reg [0:15];
+logic [5:0] W_count;   //To store current W iteration
+logic [31:0] W_reg [0:15];  //16 registers to store Recent 16 W's
 
 always_ff@(posedge clk or negedge rst)
 begin
+    //Reset Logic
     if(!rst)
     begin
         W_count <= 'b0;
         W_o <= 'b0;
         W_dv <= 'b0;
     end
-    else if(M_dv && W_count < 16)
+    else if(M_dv && W_count < 16)   //0 15 M=W. no operation, just relay
     begin
         W_reg[W_count] <= M_i;
         W_count++;
         W_o <= W_reg[W_count];
         W_dv <= 1'b1;
     end
-    else if(W_count >= 16)
+    else if(W_count >= 16)   // 16 63 W (operation according to standard)
     begin
         
         for (integer i = 0; i < 15 ; i++ ) begin
