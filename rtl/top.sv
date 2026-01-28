@@ -82,38 +82,3 @@ module top (
         .round_idx_o    (round_idx_o)
     );
 endmodule
-
- // ------------------------------------------------------------
-    // Controller FSM
-    // ------------------------------------------------------------
-//    sha256_controller u_ctrl (
-//        .clk             (clk),
-//        .rst_n           (rst_n),
-//        .msg_block_valid (valid_o),
-//        .d_valid         (d_valid),
-//        .sched_en        (sched_en),
-//        .round_idx       (round_idx),
-//        .hash_done       (hash_done)
-//    );
-
-// ------------------------------------------------------------
-    // SHA-256 K constant ROM
-    // ------------------------------------------------------------
-//    sha256_k_rom u_krom (
-//        .clk(clk),
-//        .addr (round_idx),
-//        .Kt_i (Kt_i)
-//    );
-
-    // Padder / parser
-//    logic        block_valid;
-//    logic [511:0] block_512;
-
-    // Controller
-//    logic        d_valid;
-//    logic        sched_en;
-//    logic [5:0]  round_idx;
-
-//    // Scheduler / ROM outputs
-//    logic [31:0] Wt_i;
-//    logic [31:0] Kt_i;
