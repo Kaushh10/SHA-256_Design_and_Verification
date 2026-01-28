@@ -22,8 +22,8 @@ module preproc (
     input logic         rst,
     input logic         clk,
     input logic         data_valid,
-    input logic [127:0] data_in,     
-    input logic [3:0]   byte_valid,
+    input logic [439:0] data_in,     
+    input logic [5:0]   byte_valid,
     output logic        valid_o,
     output logic [31:0] M_o
 );
