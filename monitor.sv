@@ -11,8 +11,15 @@ class sha256_monitor extends uvm_monitor;
             super.new(name,parent);
             anp = new("anp",this);
      endfunction
+     
+     function void build_phase(uvm_phase phase); 
+             super.build_phase(phase); 
+     if (!uvm_config_db#(virtual hash256)::get(this, "", "vif", vif)) begin 
+             `uvm_error("SHA256_MON", "Virtual interface not set for sha256_monitor")
+      end 
+      endfunction
 
-        task run_phase(uvm_phase phase);
+       task run_phase(uvm_phase phase);
             sha256_seq_item tr;
             forever begin
             @(posedge vif.clk);
