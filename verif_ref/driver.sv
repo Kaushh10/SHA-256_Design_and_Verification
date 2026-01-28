@@ -11,6 +11,13 @@ class sha256_driver extends uvm_driver #(sha256_seq_item);
         super.new(name,parent);
     endfunction
     
+    function void build_phase(uvm_phase phase);
+        super.build_phase(phase);
+        if (!uvm_config_db#(virtual hash256)::get(this, "", "vif", vif)) begin
+            `uvm_error("SHA256_DRV", "Virtual interface not set for driver")
+        end
+    endfunction
+   
         task run_phase(uvm_phase phase);
             sha256_seq_item tr;
          forever begin
@@ -20,7 +27,7 @@ class sha256_driver extends uvm_driver #(sha256_seq_item);
              @(posedge vif.clk);
              vif.load_i <= 1'b0;  
                 
-             for ( int i=0;i<64;i++)begin
+             for (int i=0;i<64;i++)begin
              
                 vif.Kt_i <= K[i];
                 
