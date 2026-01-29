@@ -17,15 +17,15 @@ class sha256_driver extends uvm_driver #(sha256_sequence_item);
       `uvm_fatal("NOVIF", "Virtual interface not set for sha256_driver")
   endfunction
 
-function connect_phase(uvm_phase phase);
-
-super.connect_phase();
+function void connect_phase(uvm_phase phase);
+super.connect_phase( phase);
 endfunction:connect_phase
 
 
   task run_phase(uvm_phase phase);
     sha256_sequence_item tr;
     forever begin
+      tr = sha256_sequence_item::type_id::create("tr");
       seq_item_port.get_next_item(tr);
     
       vif.data_in    <= tr.my_data;
