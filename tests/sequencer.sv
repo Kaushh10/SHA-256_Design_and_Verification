@@ -11,12 +11,12 @@ class sha_sequencer extends uvm_sequencer #(sha256_sequence_item);
         super.new(name,parent);
     endfunction
     
-    function build_phase (uvm_phase phase);
+    function void build_phase (uvm_phase phase);
     super.build_phase(phase);
     endfunction : build_phase
     
     
-    function connect_phase (uvm_phase phase);
+    function void connect_phase (uvm_phase phase);
     super.connect_phase(phase);
     endfunction : connect_phase
     
