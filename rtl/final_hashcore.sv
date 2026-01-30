@@ -1,21 +1,19 @@
+
 `timescale 1ns / 1ps
 
 module hash_core(
     input logic clk,
     input logic rst_n,
     input bit d_valid,
-    //input bit load_i,
     
     //Msg scheduler op
-   // input logic [31:0] Kt_i,      //SHA constant for the current round  from ROM module
     input logic [31:0] Wt_i,      //32 bit word from msg scheduler  
     
     //output: 8 working variable registers (each of 32 bits) that hold hash state
     output logic [255:0] fin_hash,
-    output logic done,          // flag when all 64 rounds complete
-    output logic [6:0] round_idx_o // Output for Testbench Sync
+    output logic done         // flag when all 64 rounds complete
 );
-//logic compute_done;   
+
 //intermediate hash state registers
     logic [31:0] H0, H1, H2, H3, H4, H5, H6, H7;
 //working variables
@@ -52,16 +50,12 @@ module hash_core(
         assign Kt_i = ROM[count];
 
       //combinational functions
-//logic [31:0] T1, T2;
-//logic [31:0] sigma_0, sigma_1, Maj, Ch;
 
 // ROTR function
 function automatic logic [31:0] rotr(input logic [31:0] x, input int n);
    rotr = (x>>n) | (x << (32-n));
 endfunction
 
-
-         
          
 function automatic logic [31:0] Ch(input logic [31:0] x, y, z);
     Ch = (x & y) ^ (~x & z);
@@ -85,7 +79,7 @@ endfunction
 
 
 
-always_ff @(posedge clk)
+always_ff @(posedge clk or negedge rst_n)
  begin
     if (!rst_n) 
         begin
@@ -111,19 +105,14 @@ always_ff @(posedge clk)
                     H5 <= 32'h9b05688c; 
                     H6 <= 32'h1f83d9ab; 
                     H7 <= 32'h5be0cd19;
-                
-                //ROM values for Kt_i
-       
-                
         end
         
     else 
         begin    
-            if(d_valid == 1)
+            // MAJOR FIX: Only process when d_valid is high AND we haven't completed 64 rounds
+            if(d_valid == 1'b1 && count < 64)
                  begin
-                    count <= 7'b0;
-                    done <= 1'b0;
-      
+                    // Perform the round computation
                     h <= g;
                     g <= f;
                     f <= e; 
@@ -132,15 +121,30 @@ always_ff @(posedge clk)
                     b <= a;
                     e <= d + T1;
                     a <= T1 + T2;
+                    
+                    // Increment counter
                     count <= count + 1'b1;
-
-           
-                 end    
+                    
+                    // Set done flag when reaching round 63 (will be 64 next cycle)
+                    if (count == 7'd63) begin
+                        done <= 1'b1;
+                        count <= 7'd0;
+                    end else begin
+                        done <= 1'b0;
+                    end
+                 end
+            else if (count >= 64) begin
+                // Stay in done state, wait for reset or new block
+                done <= 1'b1;
+            end
+            else begin
+                // No valid data, maintain current state
+                done <= 1'b0;
             end
         end
+end
 
-    assign round_idx_o = count;
-    assign done = (count==63);
+     
     
     //use the CAPTURED start values, not the live input ports
     assign A_o = a + H0;
@@ -153,28 +157,7 @@ always_ff @(posedge clk)
     assign H_o = h + H7;
     
                
-    //finaal op
+    //final op
     assign fin_hash = {A_o,B_o,C_o,D_o,E_o,F_o,G_o,H_o};
 
 endmodule
-
-
-// ROM Address Logic
-    // If resetting, we could theoretically pull H values, but usually, 
-    // internal registers are hardcoded or loaded once. 
-    // For this design, we use counter_iteration to get K values.
-    //assign rom_addr = counter_iteration;
-    
-    //ROM instantiation
-    //sha256_k_rom constants_inst (.clk(clk), .addr(rom_addr), dataout(Kt_i));
-
-//always_comb
-//         begin
-//            sigma_1 = rotr(E_o,6) ^ rotr(E_o,11) ^ rotr(E_o,25);
-//            sigma_0 = rotr(A_o,2) ^ rotr(A_o,13) ^ rotr(A_o,22);
-             
-//            Maj = (A_o & B_o) ^ (A_o & C_o) ^ (B_o & C_o);
-//            Ch = (E_o & F_o) ^ ((~ E_o) & G_o);
-             
-         
-//         end
