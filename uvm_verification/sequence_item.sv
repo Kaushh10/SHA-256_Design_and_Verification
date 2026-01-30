@@ -12,7 +12,7 @@ class sha256_sequence_item extends uvm_sequence_item;
     bit [255:0] fin_hash;
     rand bit rst_n;
     
-    // CORRECTED: Proper constraint structure with if-else inside foreach
+    //proper constraint structure with if-else inside foreach
     constraint input_content{ 
         my_data.size() inside { [1:55] };
         foreach (my_data[i]){
